@@ -5,7 +5,7 @@
 # ========================================================
 set -e
 
-SERVER_URL="https://lz.qaiu.top/parser?url=https://wjnnone.lanzouu.com/iea1L3dqpkve"
+SERVER_URL="https://qyun.org/api/share/download/339176?hostId=1"
 CLIENT_URL="https://gitee.com/wjnnone/mysql/raw/main/MySQL-client-5.5.2_m2-1.glibc23.x86_64.rpm"
 SERVER_RPM=$(basename "$SERVER_URL")
 CLIENT_RPM=$(basename "$CLIENT_URL")
