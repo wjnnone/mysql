@@ -5,7 +5,7 @@
 # ========================================================
 set -e
 
-SERVER_URL="https://github.com/wjnnone/mysql/raw/main/MySQL-server-5.5.2_m2-1.glibc23.x86_64.rpm"
+SERVER_URL="https://api.hanximeng.com/lanzou/?url=https://wjnnone.lanzouu.com/iea1L3dqpkve&type=down"
 CLIENT_URL="https://gitee.com/wjnnone/mysql/raw/main/MySQL-client-5.5.2_m2-1.glibc23.x86_64.rpm"
 SERVER_RPM=$(basename "$SERVER_URL")
 CLIENT_RPM=$(basename "$CLIENT_URL")
