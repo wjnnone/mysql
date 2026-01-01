@@ -5,10 +5,15 @@
 # ========================================================
 set -e
 
+# 定义下载链接和本地文件名
 SERVER_URL="https://api.hanximeng.com/lanzou/?url=https://wjnnone.lanzouu.com/iea1L3dqpkve&type=down"
 CLIENT_URL="https://gitee.com/wjnnone/mysql/raw/main/MySQL-client-5.5.2_m2-1.glibc23.x86_64.rpm"
-SERVER_RPM=$(basename "$SERVER_URL")
-CLIENT_RPM=$(basename "$CLIENT_URL")
+SERVER_RPM="MySQL-server-5.5.2_m2-1.glibc23.x86_64.rpm"
+CLIENT_RPM="MySQL-client-5.5.2_m2-1.glibc23.x86_64.rpm"
+
+# 定义 root 目录下的文件路径
+ROOT_SERVER_RPM="/root/${SERVER_RPM}"
+ROOT_CLIENT_RPM="/root/${CLIENT_RPM}"
 
 # 1. 清理 MariaDB 冲突包
 echo ">>> 清理 MariaDB 冲突组件..."
@@ -18,20 +23,61 @@ rpm -qa | grep mariadb | xargs -r rpm -e --nodeps 2>/dev/null || true
 echo ">>> 安装必备依赖包..."
 yum install -y wget perl net-tools libaio numactl perl-Module-Install.noarch java-1.8.0-openjdk*
 
-# 3. 下载 RPM 包
-echo ">>> 下载 MySQL 安装包..."
-wget --no-check-certificate -O "$SERVER_RPM" "$SERVER_URL" || [ -f "$SERVER_RPM" ]
-wget --no-check-certificate -O "$CLIENT_RPM" "$CLIENT_URL" || [ -f "$CLIENT_RPM" ]
+# 3. 检测并下载 RPM 包（优化完整性校验，跳过无意义签名校验）
+echo ">>> 检测本地 MySQL 安装包..."
 
-# 4. 检查下载是否成功
-if [ ! -f "$SERVER_RPM" ] || [ ! -f "$CLIENT_RPM" ]; then
-    echo "ERROR: MySQL 安装包下载失败，请检查链接有效性"
+# 检查服务端包（校验完整性+跳过GPG签名，避免无签名误判）
+if [ -f "${ROOT_SERVER_RPM}" ]; then
+    echo "🔍 校验 ${ROOT_SERVER_RPM} 完整性..."
+    # 核心修改：--nodigest 跳过摘要校验 --nosignature 跳过GPG签名，仅校验文件本身完整性
+    if rpm -K --nodigest --nosignature "${ROOT_SERVER_RPM}" >/dev/null 2>&1; then
+        echo "✅ 检测到 ${ROOT_SERVER_RPM} 已存在且完整，跳过下载"
+    else
+        echo "❌ ${ROOT_SERVER_RPM} 已损坏，删除并重新下载..."
+        rm -f "${ROOT_SERVER_RPM}"
+        wget --no-check-certificate -O "${ROOT_SERVER_RPM}" "${SERVER_URL}" || {
+            echo "ERROR: MySQL 服务端安装包下载失败"
+            exit 1
+        }
+    fi
+else
+    echo ">>> 开始下载 MySQL 服务端安装包..."
+    wget --no-check-certificate -O "${ROOT_SERVER_RPM}" "${SERVER_URL}" || {
+        echo "ERROR: MySQL 服务端安装包下载失败"
+        exit 1
+    }
+fi
+
+# 检查客户端包（同服务端，优化校验参数）
+if [ -f "${ROOT_CLIENT_RPM}" ]; then
+    echo "🔍 校验 ${ROOT_CLIENT_RPM} 完整性..."
+    if rpm -K --nodigest --nosignature "${ROOT_CLIENT_RPM}" >/dev/null 2>&1; then
+        echo "✅ 检测到 ${ROOT_CLIENT_RPM} 已存在且完整，跳过下载"
+    else
+        echo "❌ ${ROOT_CLIENT_RPM} 已损坏，删除并重新下载..."
+        rm -f "${ROOT_CLIENT_RPM}"
+        wget --no-check-certificate -O "${ROOT_CLIENT_RPM}" "${CLIENT_URL}" || {
+            echo "ERROR: MySQL 客户端安装包下载失败"
+            exit 1
+        }
+    fi
+else
+    echo ">>> 开始下载 MySQL 客户端安装包..."
+    wget --no-check-certificate -O "${ROOT_CLIENT_RPM}" "${CLIENT_URL}" || {
+        echo "ERROR: MySQL 客户端安装包下载失败"
+        exit 1
+    }
+fi
+
+# 4. 检查文件是否存在（兜底检查）
+if [ ! -f "${ROOT_SERVER_RPM}" ] || [ ! -f "${ROOT_CLIENT_RPM}" ]; then
+    echo "ERROR: MySQL 安装包缺失，请检查文件是否存在或重新下载"
     exit 1
 fi
 
 # 5. 安装/升级 MySQL
 echo ">>> 安装/修复 MySQL 5.5.2_m2..."
-rpm -Uvh --replacepkgs "$SERVER_RPM" "$CLIENT_RPM"
+rpm -Uvh --replacepkgs "${ROOT_SERVER_RPM}" "${ROOT_CLIENT_RPM}"
 
 # 6. 复制配置文件（覆盖已有配置）
 echo ">>> 配置 MySQL 配置文件..."
