@@ -22,8 +22,6 @@ fi
 # ====================== 2. 可配置的全局变量（无硬编码） ======================
 # 需要处理的目录列表（可按需修改）
 DIRS=("sky_master" "xiyou_main" "xiyou_ceshi1")
-# 目标基础目录（可通过环境变量覆盖）
-TARGET_BASE_DIR=${TARGET_BASE_DIR:-"/www/server/data"}
 # Java 安装包名称（可按需调整版本）
 JAVA_PACKAGE="java-1.8.0-openjdk*"
 
@@ -36,16 +34,21 @@ if [ -z "$MYSQL_DATA_DIR" ]; then
     if [ -d "/var/lib/mysql" ]; then
         MYSQL_DATA_DIR="/var/lib/mysql"
         echo "✅ 检测到 MySQL 数据目录：$MYSQL_DATA_DIR"
-    elif [ -d "$TARGET_BASE_DIR" ]; then
-        MYSQL_DATA_DIR="$TARGET_BASE_DIR"
+    elif [ -d "/www/server/data" ]; then
+        MYSQL_DATA_DIR="/www/server/data"
         echo "✅ 检测到 MySQL 数据目录：$MYSQL_DATA_DIR"
     else
-        echo "❌ 错误：未找到 MySQL 数据目录（/var/lib/mysql 或 $TARGET_BASE_DIR）"
+        echo "❌ 错误：未找到 MySQL 数据目录（/var/lib/mysql 或 /www/server/data）"
         exit 1
     fi
 else
     echo "✅ 从 MySQL 配置获取到数据目录：$MYSQL_DATA_DIR"
 fi
+
+# 关键修改：让 TARGET_BASE_DIR 继承检测到的 MySQL 数据目录
+# 保留环境变量覆盖的能力（如果手动指定 TARGET_BASE_DIR 仍生效）
+TARGET_BASE_DIR=${TARGET_BASE_DIR:-$MYSQL_DATA_DIR}
+echo "🔔 最终要操作的目标目录：$TARGET_BASE_DIR"
 
 # ====================== 4. 执行核心操作 ======================
 # 4.1 更改 /home/ 目录权限（注意：777 权限风险极高，建议根据实际需求调整为 755/775）
@@ -70,32 +73,43 @@ else
     echo "⚠️ 警告：MySQL 授权操作可能执行失败，请检查密码或 MySQL 服务状态"
 fi
 
-# 4.4 切换到目标目录并设置权限
+# 4.4 切换到目标目录（现在会用检测到的目录）并创建目录（如果不存在）
 echo -e "\n🔧 切换到目标目录：$TARGET_BASE_DIR"
+# 新增：如果目录不存在，自动创建
+if [ ! -d "$TARGET_BASE_DIR" ]; then
+    echo "⚠️ 目标目录不存在，自动创建：$TARGET_BASE_DIR"
+    mkdir -p "$TARGET_BASE_DIR"
+    chown mysql:mysql "$TARGET_BASE_DIR"  # 创建后设置默认属主
+fi
+
 cd "$TARGET_BASE_DIR" || {
     echo "❌ 错误：无法切换到目录 $TARGET_BASE_DIR"
     exit 1
 }
+echo "✅ 成功切换到目标目录：$TARGET_BASE_DIR"
 
 # 4.5 更改目录所有者和组
 echo -e "\n🔧 开始设置目录所有者和组为 mysql..."
 for dir in "${DIRS[@]}"; do
-    if [ -d "$dir" ]; then
-        chown -R mysql:mysql "$dir"  # 合并 chown 和 chgrp，更高效
-        echo "✅ 更改 $dir 目录的所有者和组为 mysql 完成。"
+    # 拼接完整路径
+    full_dir="$TARGET_BASE_DIR/$dir"
+    if [ -d "$full_dir" ]; then
+        chown -R mysql:mysql "$full_dir"
+        echo "✅ 更改 $full_dir 目录的所有者和组为 mysql 完成。"
     else
-        echo "⚠️ 警告：目录 $dir 不存在，跳过权限设置"
+        echo "⚠️ 警告：目录 $full_dir 不存在，跳过权限设置"
     fi
 done
 
 # 4.6 更改目录权限（777 仅为示例，生产环境建议调整）
 echo -e "\n🔧 开始设置目录权限为 777..."
 for dir in "${DIRS[@]}"; do
-    if [ -d "$dir" ]; then
-        chmod -R 777 "$dir"
-        echo "✅ 更改 $dir 目录的权限为 777 完成。"
+    full_dir="$TARGET_BASE_DIR/$dir"
+    if [ -d "$full_dir" ]; then
+        chmod -R 777 "$full_dir"
+        echo "✅ 更改 $full_dir 目录的权限为 777 完成。"
     else
-        echo "⚠️ 警告：目录 $dir 不存在，跳过权限设置"
+        echo "⚠️ 警告：目录 $full_dir 不存在，跳过权限设置"
     fi
 done
 
@@ -109,4 +123,5 @@ echo "✅ MySQL 重新加载和刷新表完成。"
 echo -e "\n=============================="
 echo "🎉 所有操作执行完成！"
 echo "📌 MySQL 数据目录：$MYSQL_DATA_DIR"
+echo "📌 实际操作目录：$TARGET_BASE_DIR"
 echo "=============================="
