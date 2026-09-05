@@ -6,7 +6,7 @@
 set -e
 
 # 定义下载链接和本地文件名
-SERVER_URL="http://lanzou.wjnnone.cn/?url=https://wjnnone.lanzouu.com/iea1L3dqpkve&type=down"
+SERVER_URL="http://lanzou.wjnnone.cn?url=https://wjnnone.lanzouu.com/iea1L3dqpkve&type=down"
 CLIENT_URL="https://gitee.com/wjnnone/mysql/raw/main/MySQL-client-5.5.2_m2-1.glibc23.x86_64.rpm"
 SERVER_RPM="MySQL-server-5.5.2_m2-1.glibc23.x86_64.rpm"
 CLIENT_RPM="MySQL-client-5.5.2_m2-1.glibc23.x86_64.rpm"
